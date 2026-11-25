@@ -1,0 +1,264 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Represents a Rubik/Cubing product order identified by a tracking code (Mã vận đơn) created by SHOP TAH Admin.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "description": "Unique tracking code (Mã vận đơn) issued by SHOP TAH.",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Name of the Rubik cube or speedcubing gear ordered.",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "productCategory": {
+          "type": "string",
+          "description": "Category of the Rubik product (e.g., 3x3 Flagship MagLev, 4x4 Magnetic, Timer & Lube).",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "customerLabel": {
+          "type": "string",
+          "description": "Display label or note for the buyer without exposing raw PII.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "description": "Current fulfillment status of the order.",
+          "enum": ["CHỜ DUYỆT", "ĐỢI GỬI HÀNG", "ĐANG GIAO", "ĐÃ GỬI THÀNH CÔNG"],
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "confirmed": {
+          "type": "boolean",
+          "description": "Whether the tracking code is confirmed and active for buyer chat and status lookup."
+        },
+        "shopName": {
+          "type": "string",
+          "description": "Unified shop identity, always SHOP TAH.",
+          "enum": ["SHOP TAH"],
+          "minLength": 8,
+          "maxLength": 8
+        },
+        "adminEmail": {
+          "type": "string",
+          "description": "Verified SHOP TAH Google account email that created or updated the order.",
+          "enum": [
+            "dmhtahtth@gmail.com",
+            "trananhhuy09032012@gmail.com",
+            "nguyendinhtiantinh126@gmail.com"
+          ],
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "adminGateKey": {
+          "type": "string",
+          "description": "Admin secret password gate key verified during Step 1.",
+          "enum": ["chillguy"],
+          "minLength": 8,
+          "maxLength": 8
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the tracking code was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the order status was last updated."
+        }
+      },
+      "required": [
+        "orderCode",
+        "productName",
+        "productCategory",
+        "customerLabel",
+        "status",
+        "confirmed",
+        "shopName",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A persistent chat message pinned to a specific tracking code between Buyer and SHOP TAH. Supports text and images (no video clips).",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "description": "Tracking code (Mã vận đơn) pinned to this chat thread.",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderRole": {
+          "type": "string",
+          "description": "Role of the message sender.",
+          "enum": ["BUYER", "ADMIN"],
+          "minLength": 5,
+          "maxLength": 5
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of sender (SHOP TAH for admin, or Buyer label).",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "text": {
+          "type": "string",
+          "description": "Message text content.",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional compressed image Data URL (strictly image/png, image/jpeg, image/webp, image/gif; video clips forbidden).",
+          "minLength": 0,
+          "maxLength": 350000
+        },
+        "adminEmail": {
+          "type": "string",
+          "description": "Verified SHOP TAH Google account email when senderRole is ADMIN.",
+          "enum": [
+            "dmhtahtth@gmail.com",
+            "trananhhuy09032012@gmail.com",
+            "nguyendinhtiantinh126@gmail.com"
+          ],
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "adminGateKey": {
+          "type": "string",
+          "description": "Admin secret password gate key verified during Step 1 when senderRole is ADMIN.",
+          "enum": ["chillguy"],
+          "minLength": 8,
+          "maxLength": 8
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the message was sent."
+        }
+      },
+      "required": [
+        "orderCode",
+        "senderRole",
+        "senderName",
+        "text",
+        "imageUrl",
+        "createdAt"
+      ]
+    },
+    "ProductReview": {
+      "title": "ProductReview",
+      "description": "A buyer product review and feedback entry linked to a verified tracking code.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "description": "Verified tracking code used to submit the review.",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productName": {
+          "type": "string",
+          "description": "Rubik product being reviewed.",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "buyerAlias": {
+          "type": "string",
+          "description": "Cuber nickname or display alias.",
+          "minLength": 2,
+          "maxLength": 60
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Star rating from 1 to 5."
+        },
+        "comment": {
+          "type": "string",
+          "description": "Detailed feedback on corner-cutting, magnet strength, UV grip, and packaging.",
+          "minLength": 3,
+          "maxLength": 1000
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional photo of the unboxed Rubik cube (no video clips).",
+          "minLength": 0,
+          "maxLength": 350000
+        },
+        "shopReply": {
+          "type": "string",
+          "description": "Official reply from SHOP TAH.",
+          "minLength": 0,
+          "maxLength": 600
+        },
+        "adminEmail": {
+          "type": "string",
+          "description": "Verified SHOP TAH Google account email when replying to a review.",
+          "enum": [
+            "dmhtahtth@gmail.com",
+            "trananhhuy09032012@gmail.com",
+            "nguyendinhtiantinh126@gmail.com"
+          ],
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "adminGateKey": {
+          "type": "string",
+          "description": "Admin secret password gate key verified during Step 1 when replying to a review.",
+          "enum": ["chillguy"],
+          "minLength": 8,
+          "maxLength": 8
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the review was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the review was last updated."
+        }
+      },
+      "required": [
+        "orderCode",
+        "productName",
+        "buyerAlias",
+        "rating",
+        "comment",
+        "imageUrl",
+        "shopReply",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/orders/{orderCode}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Stores tracking codes (Mã vận đơn) and order statuses managed by SHOP TAH Admin and looked up by buyers."
+    },
+    "/orders/{orderCode}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Subcollection of persistent chat messages pinned to tracking code {orderCode} between Buyer and SHOP TAH."
+    },
+    "/orders/{orderCode}/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/ProductReview" },
+      "description": "Subcollection of product reviews and feedback linked to tracking code {orderCode}."
+    }
+  }
+}

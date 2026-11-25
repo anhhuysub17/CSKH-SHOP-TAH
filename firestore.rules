@@ -1,0 +1,319 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAllowedAdminEmailString(email) {
+      return email is string &&
+        email.size() >= 5 &&
+        email.size() <= 100 &&
+        (
+          email == 'dmhtahtth@gmail.com' ||
+          email == 'trananhhuy09032012@gmail.com' ||
+          email == 'nguyendinhtiantinh126@gmail.com'
+        );
+    }
+
+    // Unified SHOP TAH Admin Verification (3 allowlisted Google accounts + email_verified gate)
+    function isAdmin() {
+      return isVerifiedEmail() && (
+        isAllowedAdminEmailString(request.auth.token.email) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Dual-layer Admin Gate Proof (Step 1 secret key 'chillguy' + Step 2 allowlisted SHOP TAH email)
+    function hasValidAdminPayloadGate(data) {
+      return ('adminEmail' in data) &&
+        ('adminGateKey' in data) &&
+        isAllowedAdminEmailString(data.adminEmail) &&
+        data.adminGateKey is string &&
+        data.adminGateKey.size() == 8 &&
+        data.adminGateKey == 'chillguy';
+    }
+
+    function isAuthorizedAdminWrite(data) {
+      return isAdmin() || hasValidAdminPayloadGate(data);
+    }
+
+    function isOptionalAdminFieldsValid(data) {
+      return (!('adminEmail' in data) || isAllowedAdminEmailString(data.adminEmail)) &&
+        (!('adminGateKey' in data) || (data.adminGateKey is string && data.adminGateKey.size() == 8 && data.adminGateKey == 'chillguy'));
+    }
+
+    // Image-only validation guard (strictly blocks video clips and oversized blobs)
+    function isValidImageDataUrl(url) {
+      return url is string &&
+        url.size() <= 350000 &&
+        (
+          url.size() == 0 ||
+          url.matches('^data:image/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+$')
+        );
+    }
+
+    // Master Gate: Verifies parent order exists and is confirmed by SHOP TAH
+    function isConfirmedOrder(orderCode) {
+      return exists(/databases/$(database)/documents/orders/$(orderCode)) &&
+        get(/databases/$(database)/documents/orders/$(orderCode)).data.confirmed == true;
+    }
+
+    // 3. Entity Validation Blueprints (Anti-Update-Gap)
+    function isValidOrder(data, orderCode) {
+      return data.keys().hasAll([
+          'orderCode',
+          'productName',
+          'productCategory',
+          'customerLabel',
+          'status',
+          'confirmed',
+          'shopName',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode',
+          'productName',
+          'productCategory',
+          'customerLabel',
+          'status',
+          'confirmed',
+          'shopName',
+          'adminEmail',
+          'adminGateKey',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isOptionalAdminFieldsValid(data) &&
+        data.orderCode is string &&
+        data.orderCode.size() >= 3 &&
+        data.orderCode.size() <= 64 &&
+        data.orderCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.orderCode == orderCode &&
+        data.productName is string &&
+        data.productName.size() >= 2 &&
+        data.productName.size() <= 160 &&
+        data.productCategory is string &&
+        data.productCategory.size() >= 2 &&
+        data.productCategory.size() <= 80 &&
+        data.customerLabel is string &&
+        data.customerLabel.size() >= 1 &&
+        data.customerLabel.size() <= 120 &&
+        data.status is string &&
+        data.status.size() >= 2 &&
+        data.status.size() <= 40 &&
+        (
+          data.status == 'CHỜ DUYỆT' ||
+          data.status == 'ĐỢI GỬI HÀNG' ||
+          data.status == 'ĐANG GIAO' ||
+          data.status == 'ĐÃ GỬI THÀNH CÔNG'
+        ) &&
+        data.confirmed is bool &&
+        data.shopName is string &&
+        data.shopName.size() == 8 &&
+        data.shopName == 'SHOP TAH' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data, orderCode) {
+      return data.keys().hasAll([
+          'orderCode',
+          'senderRole',
+          'senderName',
+          'text',
+          'imageUrl',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode',
+          'senderRole',
+          'senderName',
+          'text',
+          'imageUrl',
+          'adminEmail',
+          'adminGateKey',
+          'createdAt'
+        ]) &&
+        isOptionalAdminFieldsValid(data) &&
+        data.orderCode is string &&
+        data.orderCode.size() >= 3 &&
+        data.orderCode.size() <= 64 &&
+        data.orderCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.orderCode == orderCode &&
+        data.senderRole is string &&
+        data.senderRole.size() == 5 &&
+        (data.senderRole == 'BUYER' || data.senderRole == 'ADMIN') &&
+        data.senderName is string &&
+        data.senderName.size() >= 2 &&
+        data.senderName.size() <= 80 &&
+        data.text is string &&
+        data.text.size() >= 0 &&
+        data.text.size() <= 1000 &&
+        (data.text.size() > 0 || data.imageUrl.size() > 0) &&
+        isValidImageDataUrl(data.imageUrl) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidReview(data, orderCode) {
+      return data.keys().hasAll([
+          'orderCode',
+          'productName',
+          'buyerAlias',
+          'rating',
+          'comment',
+          'imageUrl',
+          'shopReply',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'orderCode',
+          'productName',
+          'buyerAlias',
+          'rating',
+          'comment',
+          'imageUrl',
+          'shopReply',
+          'adminEmail',
+          'adminGateKey',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isOptionalAdminFieldsValid(data) &&
+        data.orderCode is string &&
+        data.orderCode.size() >= 3 &&
+        data.orderCode.size() <= 64 &&
+        data.orderCode.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.orderCode == orderCode &&
+        data.productName is string &&
+        data.productName.size() >= 2 &&
+        data.productName.size() <= 160 &&
+        data.buyerAlias is string &&
+        data.buyerAlias.size() >= 2 &&
+        data.buyerAlias.size() <= 60 &&
+        data.rating is int &&
+        data.rating >= 1 &&
+        data.rating <= 5 &&
+        data.comment is string &&
+        data.comment.size() >= 3 &&
+        data.comment.size() <= 1000 &&
+        isValidImageDataUrl(data.imageUrl) &&
+        data.shopReply is string &&
+        data.shopReply.size() >= 0 &&
+        data.shopReply.size() <= 600 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules
+    match /orders/{orderCode} {
+      // Buyers look up a specific order by its exact secret tracking code without logging in
+      allow get: if isValidId(orderCode);
+      // Verified SHOP TAH admins can list orders scoped by shopName == 'SHOP TAH'
+      allow list: if existing().shopName == 'SHOP TAH' && (isAdmin() || ('adminGateKey' in existing() && existing().adminGateKey == 'chillguy'));
+
+      allow create: if isAuthorizedAdminWrite(incoming()) &&
+        isValidId(orderCode) &&
+        isValidOrder(incoming(), orderCode) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAuthorizedAdminWrite(incoming()) &&
+        isValidId(orderCode) &&
+        isValidOrder(incoming(), orderCode) &&
+        (existing().status != 'ĐÃ GỬI THÀNH CÔNG' || isAuthorizedAdminWrite(incoming())) &&
+        incoming().orderCode == existing().orderCode &&
+        incoming().shopName == existing().shopName &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminEmail', 'adminGateKey', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['confirmed', 'status', 'productName', 'productCategory', 'customerLabel', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['confirmed', 'status', 'productName', 'productCategory', 'customerLabel', 'adminEmail', 'adminGateKey', 'updatedAt'])
+        );
+
+      allow delete: if isAdmin() && isValidId(orderCode);
+
+      // Subcollection: Pinned Tracking Code Chat Messages
+      match /messages/{messageId} {
+        allow get: if isValidId(orderCode) && isValidId(messageId) && isConfirmedOrder(orderCode);
+        allow list: if existing().orderCode == orderCode;
+
+        allow create: if isValidId(orderCode) &&
+          isValidId(messageId) &&
+          isValidMessage(incoming(), orderCode) &&
+          incoming().createdAt == request.time &&
+          (
+            (incoming().senderRole == 'ADMIN' && incoming().senderName == 'SHOP TAH' && isAuthorizedAdminWrite(incoming())) ||
+            (incoming().senderRole == 'BUYER' && incoming().senderName != 'SHOP TAH' && !('adminGateKey' in incoming()))
+          ) &&
+          isConfirmedOrder(orderCode);
+
+        allow update: if false;
+        allow delete: if isAdmin() && isValidId(orderCode) && isValidId(messageId);
+      }
+
+      // Subcollection: Product Reviews & Feedback (Strictly 1 review per orderCode: reviewId == orderCode)
+      match /reviews/{reviewId} {
+        allow get: if isValidId(orderCode) && isValidId(reviewId) && isConfirmedOrder(orderCode);
+        allow list: if existing().orderCode == orderCode;
+
+        allow create: if isValidId(orderCode) &&
+          isValidId(reviewId) &&
+          reviewId == orderCode &&
+          isValidReview(incoming(), orderCode) &&
+          incoming().shopReply == '' &&
+          !('adminGateKey' in incoming()) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isConfirmedOrder(orderCode);
+
+        allow update: if isAuthorizedAdminWrite(incoming()) &&
+          isValidId(orderCode) &&
+          isValidId(reviewId) &&
+          isValidReview(incoming(), orderCode) &&
+          incoming().orderCode == existing().orderCode &&
+          incoming().productName == existing().productName &&
+          incoming().buyerAlias == existing().buyerAlias &&
+          incoming().rating == existing().rating &&
+          incoming().comment == existing().comment &&
+          incoming().imageUrl == existing().imageUrl &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            incoming().diff(existing()).affectedKeys().hasOnly(['shopReply', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['shopReply', 'adminEmail', 'adminGateKey', 'updatedAt'])
+          ) &&
+          isConfirmedOrder(orderCode);
+
+        allow delete: if isAdmin() && isValidId(orderCode) && isValidId(reviewId);
+      }
+    }
+  }
+}

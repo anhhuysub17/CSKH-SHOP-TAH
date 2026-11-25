@@ -1,0 +1,6 @@
+{
+  "name": "SHOP TAH — Trung Tâm Đánh Giá, Hỗ Trợ & Tra Cứu Đơn Hàng Rubik",
+  "description": "Cổng tra cứu trạng thái vận đơn, đánh giá sản phẩm Rubik Speedcubing và nhắn tin trực tiếp với SHOP TAH bằng mã vận đơn không cần đăng nhập.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
